@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>FIREBASE XML & JSON LIVE VISUAL MATCHER</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  <!-- FileSaver Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #060609;
+      --card: #0d0d14;
+      --border: #1d1d2b;
+      --accent: #e51d38;
+      --accent-glow: rgba(229, 29, 56, 0.4);
+      --green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.3);
+      --warning: #f59e0b;
+      --cyan: #06b6d4;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Share Tech Mono', monospace; user-select: none; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; padding: 24px 16px 60px; overflow-x: hidden; }
+    .container { max-width: 780px; margin: 0 auto; }
+
+    /* Header */
+    .header-box { text-align: center; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+    .header-title { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 2px; }
+    .header-title span { color: var(--accent); }
+    .header-desc { font-size: 11px; color: var(--muted); margin-top: 5px; letter-spacing: 1px; }
+
+    /* Cards */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; overflow: hidden; }
+    .card-title { font-size: 13px; font-weight: bold; color: var(--accent); letter-spacing: 1.5px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+
+    /* Drag & Drop */
+    .drop-zone { border: 2px dashed #242436; border-radius: 14px; padding: 22px 16px; text-align: center; background: #08080d; cursor: pointer; transition: 0.25s; position: relative; }
+    .drop-zone:hover { border-color: var(--accent); background: #0e0e16; }
+    .drop-zone input[type=file] { display: none; }
+    .drop-text { font-size: 13px; color: #94a3b8; font-weight: bold; }
+    .drop-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    /* অ্যানিমেশন লোডার */
+    .scanning-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(8, 8, 13, 0.95); border-radius: 14px; align-items: center; justify-content: center; flex-direction: column; gap: 8px; z-index: 10; }
+    .spinner { width: 30px; height: 30px; border: 3px solid rgba(229, 29, 56, 0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .scan-beam { font-size: 11px; color: var(--accent); letter-spacing: 1.5px; font-weight: bold; animation: pulseText 1s ease infinite; }
+
+    /* JSON ইনস্পেক্টর ভিউয়ার */
+    .inspector-box { display: none; background: #07070b; border: 1px solid #1a1a26; border-radius: 14px; padding: 14px; margin-top: 14px; max-height: 220px; overflow-y: auto; font-size: 11px; }
+    .tree-row { padding: 4px 6px; border-bottom: 1px dashed #14141e; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .tree-key { color: var(--cyan); font-weight: bold; }
+    .tree-val { color: #cbd5e1; word-break: break-all; text-align: right; }
+
+    /* এক্সএমএল/এইচটিএমএল স্ক্যান ভিউয়ার */
+    .xml-tags-box { display: none; margin-top: 12px; gap: 6px; flex-wrap: wrap; }
+    .tag-badge { background: #12121c; border: 1px solid #202030; color: var(--green); padding: 5px 10px; border-radius: 8px; font-size: 11px; }
+    .tag-badge.miss { color: var(--warning); border-color: rgba(245, 158, 11, 0.3); }
+
+    /* লাইভ ট্রান্সফার বোর্ড */
+    .live-board { display: none; background: #08080d; border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 18px; }
+    .board-header { font-size: 13px; font-weight: bold; color: var(--warning); letter-spacing: 1.5px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+
+    .field-row { background: #101018; border: 1px solid #202030; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; transition: all 0.3s; opacity: 0.35; }
+    .field-row.active { opacity: 1; border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow); transform: scale(1.01); }
+    .field-row.done { opacity: 1; border-color: var(--green); box-shadow: 0 0 12px var(--green-glow); }
+
+    .row-top { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; }
+    .key-badge { color: #fde047; letter-spacing: 1px; }
+    .status-badge { font-size: 10px; padding: 3px 8px; border-radius: 6px; background: #1a1a26; color: #94a3b8; }
+    .field-row.done .status-badge { background: rgba(16, 185, 129, 0.2); color: var(--green); }
+
+    .row-body { display: flex; align-items: center; justify-content: space-between; font-size: 11px; gap: 8px; }
+    .val-box { flex: 1; background: #06060a; padding: 8px 10px; border-radius: 8px; border: 1px solid #161622; word-break: break-all; color: #94a3b8; min-height: 32px; display: flex; align-items: center; }
+    .val-box.new { color: var(--green); border-color: rgba(16, 185, 129, 0.3); }
+    .arrow-anim { color: var(--accent); font-weight: bold; font-size: 16px; animation: bounce 0.8s infinite alternate; }
+
+    /* মিসিং বক্স */
+    .missing-box { display: none; background: #161208; border: 1px solid var(--warning); border-radius: 16px; padding: 18px; margin-bottom: 18px; animation: slideDown 0.3s ease; }
+    .missing-title { color: var(--warning); font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+    .missing-desc { font-size: 11px; color: #cbd5e1; margin-bottom: 12px; line-height: 1.5; }
+    .input-field { width: 100%; background: #06060a; border: 1px solid #3d2f0b; border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 12px; outline: none; margin-bottom: 10px; }
+    .input-field:focus { border-color: var(--warning); }
+
+    /* বোতাম */
+    .btn { width: 100%; padding: 15px; border-radius: 14px; border: none; font-size: 13px; font-weight: bold; letter-spacing: 1.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.15s; }
+    .btn:active { transform: scale(0.98); }
+    .btn-red { background: linear-gradient(180deg, #e51d38 0%, #ba0d23 100%); color: #fff; box-shadow: 0 4px 18px var(--accent-glow); margin-top: 10px; }
+    .btn-green { background: linear-gradient(180deg, #10b981 0%, #059669 100%); color: #fff; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulseText { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    @keyframes bounce { from { transform: translateX(0); } to { transform: translateX(5px); } }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header-box">
+      <div class="header-title"><span>FIREBASE</span> XML & JSON MATCHER</div>
+      <div class="header-desc">DEEP SCAN • FULL VISUAL INSPECTOR • REAL-TIME MIGRATION</div>
+    </div>
+
+    <!-- ১. গুগল জেসন ইনপুট ও ফুল ডাটা ভিউয়ার -->
+    <div class="card">
+      <div class="card-title">
+        <span>01. GOOGLE JSON ফাইল আপলোড ও ডাটা ইন্সপেক্টর</span>
+        <span id="jsonCountBadge" style="font-size: 11px; color: var(--cyan);"></span>
+      </div>
+      <div class="drop-zone" onclick="document.getElementById('jsonFile').click()">
+        <div class="scanning-overlay" id="jsonScanAnim">
+          <div class="spinner"></div>
+          <div class="scan-beam">ANALYZING JSON KEYS & RECURSIVE TREE...</div>
+        </div>
+        <p class="drop-text" id="jsonLabel">SELECT OR DROP GOOGLE-SERVICES.JSON</p>
+        <p class="drop-sub">গুগল ফায়ারবেসের সমস্ত প্যারামিটার বিশ্লেষণ ও চেক করা হবে</p>
+        <input type="file" id="jsonFile" accept=".json,.txt" onchange="handleJsonUpload(this)">
+      </div>
+      
+      <!-- জেসনের সব ডাটা দেখানোর বক্স -->
+      <div class="inspector-box" id="jsonInspector"></div>
+    </div>
+
+    <!-- ২. টার্গেট ফাইল ইনপুট (.xml বা .html) -->
+    <div class="card">
+      <div class="card-title">
+        <span>02. টার্গেট ফাইল আপলোড (.XML / .HTML)</span>
+        <span id="xmlCountBadge" style="font-size: 11px; color: var(--green);"></span>
+      </div>
+      <div class="drop-zone" onclick="document.getElementById('xmlFile').click()">
+        <div class="scanning-overlay" id="xmlScanAnim">
+          <div class="spinner"></div>
+          <div class="scan-beam">PARSING XML / HTML TAGS & FIREBASE KEYS...</div>
+        </div>
+        <p class="drop-text" id="xmlLabel">SELECT TARGET XML / HTML FILE</p>
+        <p class="drop-sub">ফাইলে পূর্বে যে ফায়ারবেস কীগুলি ছিল তা স্ক্যান করা হবে</p>
+        <input type="file" id="xmlFile" accept=".xml,.html,.htm" onchange="handleXmlUpload(this)">
+      </div>
+
+      <!-- ফাইলে কী কী পাওয়া গেছে তার ট্যাগ লিস্ট -->
+      <div class="xml-tags-box" id="xmlTagsBox"></div>
+    </div>
+
+    <!-- ৩. মিসিং ডেটা সেকশন (যদি কিছু সত্যি না থাকে) -->
+    <div class="missing-box" id="missingBox">
+      <div class="missing-title">⚠️ ফায়ারবেস ডেটাবেস ইউআরএল প্রয়োজন</div>
+      <p class="missing-desc">
+        আপনার জেসন ফাইলটি সফলভাবে বিশ্লেষণ করা হয়েছে, তবে গুগল ফায়ারবেস জেসনে <b>Realtime Database URL</b> ছিল না। দয়া করে নিচে এটি দিন:
+      </p>
+      <input type="text" id="manualDbUrl" class="input-field" placeholder="https://your-project-default-rtdb.firebaseio.com">
+      <button class="btn btn-green" onclick="confirmMissingDb()">ইউআরএল নিশ্চিত করুন</button>
+    </div>
+
+    <!-- ৪. লাইভ ট্রান্সফার অ্যানিমেশন বোর্ড -->
+    <div class="live-board" id="liveBoard">
+      <div class="board-header">
+        <span>🔄 লাইভ ট্রান্সফার মনিটর (STEP-BY-STEP MIGRATION)</span>
+        <span id="progressText" style="font-size: 11px; color:#a1a1aa;">অপেক্ষমান...</span>
+      </div>
+      <div id="fieldsTransferList"></div>
+    </div>
+
+    <!-- ৫. ডাউনলোড সেকশন -->
+    <div class="card" id="actionCard" style="display:none;">
+      <button class="btn btn-red" onclick="downloadModifiedFile()">
+        ✔ আপডেট করা ফাইল একই নামে ডাউনলোড করুন
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let extractedJson = {};
+    let targetFile = null;
+    let oldKeysFound = {};
+    let isXmlFormat = false;
+    let finalOutputFileContent = "";
+
+    // ১. জেসন ডিপ-স্ক্যানিং ও ইউজারকে সবকিছু দেখানো
+    function handleJsonUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const anim = document.getElementById('jsonScanAnim');
+      anim.style.display = 'flex';
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        setTimeout(() => {
+          extractedJson = {};
+          const raw = e.target.result;
+          
+          try {
+            const parsed = JSON.parse(raw);
+            // রিকার্সিভলি সমস্ত ডেটা এক্সট্র্যাক্ট করা
+            function deepExtract(obj) {
+              for (let k in obj) {
+                if (typeof obj[k] === 'object' && obj[k] !== null) {
+                  deepExtract(obj[k]);
+                } else if (typeof obj[k] === 'string' || typeof obj[k] === 'number') {
+                  extractedJson[k] = String(obj[k]);
+                }
+              }
+            }
+            deepExtract(parsed);
+
+            // google-services.json স্পেশাল ম্যাপিং
+            if (parsed.project_info) {
+              extractedJson.projectId = parsed.project_info.project_id || extractedJson.projectId || "";
+              extractedJson.databaseURL = parsed.project_info.firebase_url || extractedJson.databaseURL || "";
+              extractedJson.storageBucket = parsed.project_info.storage_bucket || extractedJson.storageBucket || "";
+            }
+            if (parsed.client && parsed.client[0] && parsed.client[0].api_key) {
+              extractedJson.apiKey = parsed.client[0].api_key[0].current_key || extractedJson.apiKey || "";
+            }
+          } catch (err) {
+            // প্লেইন টেক্সট হলে রেগেক্স
+            const standardKeys = ["apiKey", "projectId", "databaseURL", "storageBucket", "appId", "messagingSenderId"];
+            standardKeys.forEach(k => {
+              const m = raw.match(new RegExp(`${k}["']?\s*:\s*["']([^"']+)["']`));
+              if (m) extractedJson[k] = m[1];
+            });
+          }
+
+          anim.style.display = 'none';
+          document.getElementById('jsonLabel').innerText = "LOADED: " + file.name;
+          
+          // ইউজারকে জেসনের ভেতর পাওয়া সমস্ত ডাটা ভিজ্যুয়ালি দেখানো
+          renderJsonInspector();
+          checkReadiness();
+        }, 700);
+      };
+      reader.readAsText(file);
+    }
+
+    function renderJsonInspector() {
+      const inspector = document.getElementById('jsonInspector');
+      inspector.innerHTML = "";
+      const keys = Object.keys(extractedJson);
+      document.getElementById('jsonCountBadge').innerText = `${keys.length} FIELDS DETECTED`;
+
+      keys.forEach(k => {
+        const row = document.createElement('div');
+        row.className = "tree-row";
+        row.innerHTML = `<span class="tree-key">🔹 ${k}:</span><span class="tree-val">${extractedJson[k]}</span>`;
+        inspector.appendChild(row);
+      });
+      inspector.style.display = "block";
+    }
+
+    // ২. XML বা HTML ফাইল নিখুঁতভাবে স্ক্যানিং
+    function handleXmlUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const anim = document.getElementById('xmlScanAnim');
+      anim.style.display = 'flex';
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        setTimeout(() => {
+          targetFile = {
+            name: file.name,
+            content: e.target.result
+          };
+          isXmlFormat = file.name.endsWith('.xml');
+
+          oldKeysFound = {};
+          scanFileForKeys(targetFile.content);
+
+          anim.style.display = 'none';
+          document.getElementById('xmlLabel').innerText = "LOADED: " + file.name;
+
+          renderXmlTags();
+          checkReadiness();
+        }, 700);
+      };
+      reader.readAsText(file);
+    }
+
+    function scanFileForKeys(content) {
+      if (isXmlFormat) {
+        // XML ফাইল স্ক্যান (যেমন: <string name="google_api_key">...<string name="firebase_database_url">...)
+        const xmlRegex = /<string\s+name=["']([^"']+)["']>([^<]*)<\/string>/g;
+        let match;
+        while ((match = xmlRegex.exec(content)) !== null) {
+          oldKeysFound[match[1]] = match[2];
+        }
+      } else {
+        // HTML ফাইল স্ক্যান (firebaseConfig অবজেক্ট)
+        const configMatch = content.match(/(?:const|var|let)\s+firebaseConfig\s*=\s*\{([\s\S]*?)\};/);
+        if (configMatch && configMatch[1]) {
+          const body = configMatch[1];
+          const lines = body.split("
+");
+          lines.forEach(l => {
+            const m = l.match(/([a-zA-Z0-9_]+)\s*:\s*["']([^"']*)["']/);
+            if (m) oldKeysFound[m[1]] = m[2];
+          });
+        }
+      }
+
+      // যদি ফাইলে আগে কোনো কি না পাওয়া যায় তবে স্ট্যান্ডার্ড লিস্ট ধরা হবে
+      if (Object.keys(oldKeysFound).length === 0) {
+        oldKeysFound = {
+          apiKey: "OLD_API_KEY",
+          projectId: "OLD_PROJECT_ID",
+          databaseURL: "OLD_DATABASE_URL",
+          storageBucket: "OLD_STORAGE_BUCKET"
+        };
+      }
+    }
+
+    function renderXmlTags() {
+      const box = document.getElementById('xmlTagsBox');
+      box.innerHTML = "";
+      const keys = Object.keys(oldKeysFound);
+      document.getElementById('xmlCountBadge').innerText = `${keys.length} TARGET FIELDS`;
+
+      keys.forEach(k => {
+        const span = document.createElement('span');
+        span.className = "tag-badge";
+        span.innerText = `⚙ ${k}`;
+        box.appendChild(span);
+      });
+      box.style.display = "flex";
+    }
+
+    // ৩. চেকিং ও মিসিং হ্যান্ডলিং
+    function checkReadiness() {
+      if (Object.keys(extractedJson).length > 0 && targetFile) {
+        // যদি ডাটাবেস URL মিসিং থাকে
+        if (!extractedJson.databaseURL || extractedJson.databaseURL.trim() === "") {
+          document.getElementById('missingBox').style.display = 'block';
+          return;
+        }
+        startVisualMigration();
+      }
+    }
+
+    function confirmMissingDb() {
+      const val = document.getElementById('manualDbUrl').value.trim();
+      if (!val) {
+        alert("দয়া করে সঠিক Firebase Database URL দিন!");
+        return;
+      }
+      extractedJson.databaseURL = val;
+      renderJsonInspector();
+      document.getElementById('missingBox').style.display = 'none';
+      startVisualMigration();
+    }
+
+    // ৪. লাইভ ট্রান্সফার অ্যানিমেশন (একটি একটি করে ট্রান্সফার হওয়া)
+    function startVisualMigration() {
+      const board = document.getElementById('liveBoard');
+      const list = document.getElementById('fieldsTransferList');
+      board.style.display = 'block';
+      list.innerHTML = '';
+
+      const keysToTransfer = Object.keys(oldKeysFound);
+
+      // তালিকা তৈরি
+      keysToTransfer.forEach(key => {
+        const oldVal = oldKeysFound[key] || "EMPTY";
+        // জেসন থেকে সম্ভাব্য কি বের করা (কেস-ইনসেনসিটিভ সার্চ)
+        const matchedJsonKey = Object.keys(extractedJson).find(k => k.toLowerCase() === key.toLowerCase()) || key;
+        const newVal = extractedJson[matchedJsonKey] || extractedJson[key] || "NOT_FOUND";
+
+        const div = document.createElement('div');
+        div.className = "field-row";
+        div.id = `row-${key}`;
+        div.innerHTML = `
+          <div class="row-top">
+            <span class="key-badge">⚙ ${key.toUpperCase()}</span>
+            <span class="status-badge" id="badge-${key}">অপেক্ষমান...</span>
+          </div>
+          <div class="row-body">
+            <div class="val-box" title="পুরোনো">${oldVal}</div>
+            <div class="arrow-anim">➜</div>
+            <div class="val-box new" id="newbox-${key}" title="জেসন থেকে পাওয়া">লোড হচ্ছে...</div>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+
+      // ধাপে ধাপে রূপান্তর অ্যানিমেশন
+      let idx = 0;
+      function runNextStep() {
+        if (idx >= keysToTransfer.length) {
+          document.getElementById('progressText').innerText = "✔ সমস্ত পরিবর্তন সফলভাবে সম্পন্ন!";
+          document.getElementById('progressText').style.color = "#10b981";
+          finalizeFileReplacement();
+          document.getElementById('actionCard').style.display = 'block';
+          return;
+        }
+
+        const key = keysToTransfer[idx];
+        const row = document.getElementById(`row-${key}`);
+        const badge = document.getElementById(`badge-${key}`);
+        const newBox = document.getElementById(`newbox-${key}`);
+
+        row.classList.add('active');
+        badge.innerText = "পরিবর্তন হচ্ছে...";
+        badge.style.color = "#f59e0b";
+
+        setTimeout(() => {
+          const matchedJsonKey = Object.keys(extractedJson).find(k => k.toLowerCase() === key.toLowerCase()) || key;
+          const newVal = extractedJson[matchedJsonKey] || extractedJson[key] || oldKeysFound[key];
+
+          newBox.innerText = newVal;
+          row.classList.remove('active');
+          row.classList.add('done');
+          badge.innerText = "সফলভাবে বসেছে ✔";
+
+          idx++;
+          setTimeout(runNextStep, 600); // ৬০০ms বিরতি দিয়ে লাইভ ট্রান্সফার
+        }, 750);
+      }
+
+      runNextStep();
+    }
+
+    // ৫. ফাইলের কোড নিখুঁতভাবে রিপ্লেস করা (XML বা HTML)
+    function finalizeFileReplacement() {
+      let content = targetFile.content;
+
+      if (isXmlFormat) {
+        // XML স্ট্রিং রিপ্লেসমেন্ট
+        for (const k in oldKeysFound) {
+          const matchedJsonKey = Object.keys(extractedJson).find(jk => jk.toLowerCase() === k.toLowerCase()) || k;
+          const newVal = extractedJson[matchedJsonKey] || extractedJson[k] || oldKeysFound[k];
+          const regex = new RegExp(`(<string\s+name=["']${k}["']>)[^<]*(<\/string>)`, 'g');
+          content = content.replace(regex, `$1${newVal}$2`);
+        }
+        finalOutputFileContent = content;
+      } else {
+        // HTML firebaseConfig রিপ্লেসমেন্ট
+        let newConfigLines = [];
+        for (const k in oldKeysFound) {
+          const matchedJsonKey = Object.keys(extractedJson).find(jk => jk.toLowerCase() === k.toLowerCase()) || k;
+          const newVal = extractedJson[matchedJsonKey] || extractedJson[k] || oldKeysFound[k];
+          newConfigLines.push(`  ${k}: "${newVal}"`);
+        }
+
+        const newConfigBlock = `const firebaseConfig = {
+${newConfigLines.join(',
+')}
+};`;
+        const configRegex = /(?:const|var|let)\s+firebaseConfig\s*=\s*\{[\s\S]*?\};/g;
+
+        if (configRegex.test(content)) {
+          finalOutputFileContent = content.replace(configRegex, newConfigBlock);
+        } else {
+          finalOutputFileContent = `<script>
+${newConfigBlock}
+<\/script>
+` + content;
+        }
+      }
+    }
+
+    // ৬. একই নামে ফাইল ডাউনলোড
+    function downloadModifiedFile() {
+      const mimeType = isXmlFormat ? "application/xml;charset=utf-8" : "text/html;charset=utf-8";
+      const blob = new Blob([finalOutputFileContent], { type: mimeType });
+      saveAs(blob, targetFile.name);
+    }
+  </script>
+</body>
+</html>
